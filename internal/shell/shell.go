@@ -19,13 +19,21 @@ func New() *process.Process {
 		for {
 			fmt.Print("Hamix> ")
 			cmd, _ := reader.ReadString('\n')
+			line := strings.TrimSpace(cmd)
+			params := strings.Split(line, " ")
+			command := params[0]
+
+			args := []string{}
+			if len(params) > 1 {
+				args = params[1:]
+			}
 
 			reply := make(chan string)
 
 			call := syscall.Syscall{
 				PID:   p.PID,
-				Name:  strings.TrimSpace(cmd),
-				ARGS:  []string{},
+				Name:  command,
+				ARGS:  args,
 				Reply: reply,
 			}
 

@@ -5,6 +5,7 @@ import (
 	"hamix-os/internal/platform/logger"
 	"hamix-os/internal/process"
 	"hamix-os/internal/syscall"
+	"strconv"
 )
 
 type Kernel struct {
@@ -51,6 +52,8 @@ func (k *Kernel) handelSyscall(call syscall.Syscall) {
 	switch call.Name {
 	case "ps":
 		k.handelPS(call)
+	case "kill":
+		k.handelKill(call)
 	default:
 		call.Reply <- "Unknown syscall: " + call.Name
 	}
@@ -64,4 +67,31 @@ func (k *Kernel) handelPS(call syscall.Syscall) {
 	}
 
 	call.Reply <- result
+}
+
+func (k *Kernel) handelKill(call syscall.Syscall) {
+	if len(call.ARGS) < 1 {
+		call.Reply <- "Usage: Kill <PID>\n"
+		return
+	}
+
+	pidStr := call.ARGS[0]
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		call.Reply <- fmt.Sprintf("Invalid PID: %s", pidStr)
+		return
+	}
+
+	if pid == call.PID {
+		call.Reply <- "Process cannot kill itself. \n"
+	}
+
+	proc, exist := k.processes[pid]
+	if !exist {
+		call.Reply <- "Process does not exist"
+	}
+
+	delete(k.processes, pid)
+
+	call.Reply <- fmt.Sprintf("Process %d (%s) Terminated\n", pid, proc.Name)
 }
