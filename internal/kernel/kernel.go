@@ -12,6 +12,7 @@ type Kernel struct {
 	processes map[int]*process.Process
 	nextPID   int
 	syscalls  chan syscall.Syscall
+	program   map[string]func(*process.Process)
 }
 
 func New() *Kernel {
@@ -21,7 +22,27 @@ func New() *Kernel {
 		processes: make(map[int]*process.Process),
 		nextPID:   1,
 		syscalls:  make(chan syscall.Syscall),
+		program:   make(map[string]func(*process.Process)),
 	}
+}
+
+func (k *Kernel) Spawn(programName string) (int, error) {
+	entry, exist := k.program[programName]
+	if !exist {
+		return 0, fmt.Errorf("no such a program: %s", programName)
+	}
+
+	p := process.New(programName, entry)
+	k.RegisterProcess(p)
+
+	go p.Start()
+
+	return p.PID, nil
+}
+
+func (k *Kernel) RegisterProgram(program string, entry func(*process.Process)) {
+	k.program[program] = entry
+	logger.Kernel("Register program: " + program)
 }
 
 func (k *Kernel) RegisterProcess(p *process.Process) {
@@ -54,6 +75,8 @@ func (k *Kernel) handelSyscall(call syscall.Syscall) {
 		k.handelPS(call)
 	case "kill":
 		k.handelKill(call)
+	case "fork":
+		k.handelFork(call)
 	default:
 		call.Reply <- "Unknown syscall: " + call.Name
 	}
@@ -94,4 +117,21 @@ func (k *Kernel) handelKill(call syscall.Syscall) {
 	delete(k.processes, pid)
 
 	call.Reply <- fmt.Sprintf("Process %d (%s) Terminated\n", pid, proc.Name)
+}
+
+func (k *Kernel) handelFork(call syscall.Syscall) {
+	if len(call.ARGS) < 1 {
+		call.Reply <- "Usage: Fork <program>\n"
+		return
+	}
+
+	program := call.ARGS[0]
+
+	pid, error := k.Spawn(program)
+	if error != nil {
+		call.Reply <- error.Error()
+		return
+	}
+
+	call.Reply <- fmt.Sprintf("Spawned process %s with PID %d\"", program, pid)
 }

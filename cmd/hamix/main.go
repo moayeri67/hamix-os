@@ -3,7 +3,7 @@ package main
 import (
 	"hamix-os/internal/kernel"
 	"hamix-os/internal/platform/logger"
-	"hamix-os/internal/shell"
+	"hamix-os/internal/programs"
 )
 
 func main() {
@@ -13,11 +13,10 @@ func main() {
 	// Initialize kernel
 	k := kernel.New()
 
-	// Load first user process (shell)
-	s := shell.New()
+	k.RegisterProgram("shell", programs.Shell)
+	k.RegisterProgram("worker", programs.Worker)
 
-	// Register process in kernel
-	k.RegisterProcess(s)
+	k.Spawn("shell")
 
 	// Start kernel
 	k.Run()
